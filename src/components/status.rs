@@ -22,17 +22,17 @@ impl Component for StatusBar {
     }
     
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> color_eyre::Result<()> {
-        let chunks_h = Layout::vertical(
+        let chunks_v = Layout::vertical(
             vec![
                 Constraint::Fill(1),
-                Constraint::Max(3),
+                Constraint::Length(3),
             ]
         ).split(area);
 
         let status = Paragraph::new(format!("Current opcode: 0x{:X}", self.opcode))
             .block(Block::default().borders(Borders::ALL));
         
-        f.render_widget(status, chunks_h[1]);
+        f.render_widget(status, chunks_v[1]);
 
         Ok(())
     }
