@@ -71,7 +71,7 @@ impl App {
 
     self.emulator.load_rom_from_file("./examples/IBM Logo.ch8").expect("Can read file");
     action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
-    
+
     loop {
       if let Some(e) = tui.next().await {
         match e {
@@ -117,6 +117,7 @@ impl App {
               action_tx.send(Action::UpdateOpcode(self.emulator.get_opcode()));
               self.emulator.emulate_cycle();
               action_tx.send(Action::Redraw(self.emulator.screen()));
+              action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter() - 512));
             }
           },
           Action::Quit => self.should_quit = true,

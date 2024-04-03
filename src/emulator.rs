@@ -4,7 +4,8 @@ use std::ops::{Deref, Div};
 use std::path::Path;
 use log::Level;
 use rand::Rng;
-use itertools::Itertools;
+use itertools::{Itertools, Tuples};
+use itertools::traits::HomogeneousTuple;
 
 #[derive(Debug)]
 pub enum EmulationErr {
@@ -13,6 +14,29 @@ pub enum EmulationErr {
     InvalidRegister,
     FileError
 }
+
+
+fn font() -> Vec<u8> {
+    vec![
+        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+        0xF0, 0x80, 0xF0, 0x80, 0x80, // F
+    ]
+}
+
 
 /// Emulator of Chip-8
 pub struct Chip8Emu {
@@ -57,11 +81,15 @@ impl Chip8Emu {
     pub fn screen(&self) -> Vec<u8> { self.gfx.clone() }
     
     pub fn get_opcode(&self) -> u16 { self.opcode }
+    pub fn get_program_counter(&self) -> u16 { self.program_counter }
 
     pub fn get_opcodes(&self) -> Vec<u16> {
-        let result: Vec<u16> = Vec::new();
+        let mut result: Vec<u16> = Vec::new();
 
-
+        for (first_byte, second_byte) in self.memory[512..].iter().tuples() {
+            let opcode = (*first_byte as u16) << 8 | (*second_byte as u16);
+            result.push(opcode);
+        }
 
         result
     }
@@ -73,7 +101,10 @@ impl Chip8Emu {
         match file_contents {
             Ok(mut bytes) => {
                 let length = bytes.len();
-                self.memory = vec![0x00; 512];
+                self.memory = Vec::new();
+                self.memory.append(&mut vec![0x00; 80]);
+                self.memory.append(&mut font());
+                self.memory.append(&mut vec![0x00; 512-160]);
                 self.memory.append(&mut bytes);
                 self.memory.append(&mut vec![0x00; 4096 - length - 511]);
                 log::log!(Level::Info, "ROM loaded from file {}", file_path);
@@ -115,7 +146,7 @@ impl Chip8Emu {
             // 0x1NNN - Jump to NNN
             0x1000..=0x1FFF => {
                 self.program_counter = nnn;
-                log::log!(Level::Info, "Set PC to 0x{:X}", nnn);
+                log::log!(Level::Info, "Set PC to 0x{:0>3X}", nnn);
             },
 
             // 0x6XNN - Set register VX to NN
@@ -133,7 +164,7 @@ impl Chip8Emu {
             // 0xANNN - Set index register to NNN
             0xA000..=0xAFFF => {
                 self.index_register = nnn;
-                log::log!(Level::Info, "Set index register to 0x{:X}", nnn);
+                log::log!(Level::Info, "Set index register to 0x{:0>3X}", nnn);
             }
 
             // 0xDXYN - Draw N bytes starting at memory address in index register at (VX, VY)
@@ -148,7 +179,7 @@ impl Chip8Emu {
                     let shift = cx % 8;
                     let initial_screen_state = self.gfx[screen_byte_index as usize];
                     self.gfx[screen_byte_index as usize] ^= row_data >> shift;
-                    log::log!(Level::Info, "Drawn at {}: {:8b} -> {:8b}",
+                    log::log!(Level::Info, "Drawn at {}: {:0>8b} -> {:0>8b}",
                         screen_byte_index,
                         initial_screen_state,
                         self.gfx[screen_byte_index as usize]);
@@ -161,10 +192,12 @@ impl Chip8Emu {
                         self.registers[0xF] = 0x01;
                     }
 
-                    
+
                 }
 
                 log::log!(Level::Info, "Drawn to screen");
+                
+                // This is ugly AF but this works
                 for mut line in &self.gfx.clone().into_iter().chunks(8) {
                     let b1 = line.next().unwrap();
                     let b2 = line.next().unwrap();
@@ -174,14 +207,14 @@ impl Chip8Emu {
                     let b6 = line.next().unwrap();
                     let b7 = line.next().unwrap();
                     let b8 = line.next().unwrap();
-                    log::log!(Level::Info, "{:8b} {:8b} {:8b} {:8b} {:8b} {:8b} {:8b} {:8b}", b1, b2,
+                    log::log!(Level::Info, "{:0>8b} {:0>8b} {:0>8b} {:0>8b} {:0>8b} {:0>8b} {:0>8b} {:0>8b}", b1, b2,
                             b3, b4, b5, b6, b7, b8);
                 }
             }
 
             _ => { return Err(EmulationErr::UnknownOpcode(self.opcode)) }
         }
-        log::log!(Level::Info, "Executed opcode: 0x{:X}, registers: {:?}, index register: {}", 
+        log::log!(Level::Info, "Executed opcode: 0x{:0>4X}, registers: {:?}, index register: {}",
             self.opcode, self.registers, self.index_register);
         // Update timers
 

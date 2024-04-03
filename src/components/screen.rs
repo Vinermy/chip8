@@ -26,8 +26,18 @@ impl Component for Screen {
                 for column in 0..8 {
                     let mut byte = data[row * 8 + column];
                     let mut byte_data = String::new();
-                    let leading_space =  String::from(' ').repeat(byte.leading_zeros() as usize);
+                    let leading_space =  String::from(' ').repeat(
+                        (byte.leading_zeros() * 2) as usize
+                    );
                     while byte > 0 {
+                        byte_data.insert(
+                            0,
+                            match byte % 2 {
+                                0 => { ' ' }
+                                1 => { '█' }
+                                _ => unreachable!()
+                            }
+                        );
                         byte_data.insert(
                             0,
                             match byte % 2 {
@@ -50,7 +60,7 @@ impl Component for Screen {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> color_eyre::Result<()> {
         let chunks_h = Layout::horizontal(
             vec![
-                Constraint::Length(66),
+                Constraint::Length(130),
                 Constraint::Min(3),
             ]
         ).split(area);

@@ -16,7 +16,7 @@ impl OpcodesList {
         Self {
             state: ListState::default(),
             opcodes: Vec::new(),
-            current_opcode: 0x0000,
+            current_opcode: 0,
         }
     }
 }
