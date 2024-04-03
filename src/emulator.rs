@@ -39,7 +39,7 @@ impl Default for Chip8Emu {
             memory: vec![0x00; 4096],
             registers: vec![0x00; 16],
             index_register: 0x0000,
-            program_counter: 0x0000,
+            program_counter: 0x0200,
             gfx: vec![0x00; 8 * 32],
             delay_timer: 0x00,
             sound_timer: 0x00,
@@ -60,10 +60,11 @@ impl Chip8Emu {
         let file_contents = fs::read(file_path);
 
         match file_contents {
-            Ok(bytes) => {
+            Ok(mut bytes) => {
                 let length = bytes.len();
-                self.memory = bytes;
-                self.memory.append(&mut vec![0x00; 4096 - length]);
+                self.memory = vec![0x00; 512];
+                self.memory.append(&mut bytes);
+                self.memory.append(&mut vec![0x00; 4096 - length - 511]);
                 Ok(())
             }
             Err(_) => {
@@ -118,7 +119,7 @@ impl Chip8Emu {
             // 0xDXYN - Draw N bytes starting at memory address in index register at (VX, VY)
             0xD000..=0xDFFF => {
                 let cx: u8 = self.registers[x] & 0x3F;
-                let cy: u8 = self.registers[y] & 0x3F;
+                let cy: u8 = self.registers[y] & 0x1F;
                 self.registers[0xF] = 0x00;
 
                 for row in 0..n as u16 {
