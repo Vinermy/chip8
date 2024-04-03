@@ -51,7 +51,7 @@ impl Component for OpcodesList {
             ]
         ).split(v_chunks[0]);
 
-        let list = List::new(self.opcodes.iter().map(|x| {format!("0x{:X}", x)}))
+        let list = List::new(self.opcodes.iter().map(|x| {format!("0x{:0>4X}", x)}))
             .block(Block::default().title("Program").borders(Borders::ALL))
             .style(Style::default())
             .highlight_style(Style::default().fg(Color::LightBlue))

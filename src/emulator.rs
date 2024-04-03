@@ -117,6 +117,20 @@ impl Chip8Emu {
         }
 
     }
+    
+    pub fn update_delay_timer(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+    }
+    
+    pub fn update_sound_timer(&mut self) -> bool {
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
+            return true
+        }
+        false
+    }
 
     pub fn emulate_cycle(&mut self) -> Result<(), EmulationErr> {
         // Fetch opcode

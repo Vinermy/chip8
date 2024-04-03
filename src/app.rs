@@ -1,4 +1,5 @@
 use std::path::Components;
+use std::time::Instant;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
@@ -27,6 +28,7 @@ pub struct App {
   pub last_tick_key_events: Vec<KeyEvent>,
   pub emulator: Chip8Emu,
   pub running: bool,
+  last_timer_tick: Option<Instant>,
 }
 
 impl App {
@@ -47,6 +49,7 @@ impl App {
       last_tick_key_events: Vec::new(),
       emulator: Chip8Emu::new(),
       running: false,
+      last_timer_tick: None,
     })
   }
 
@@ -71,6 +74,7 @@ impl App {
 
     self.emulator.load_rom_from_file("./examples/test_opcode.ch8").expect("Can read file");
     action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
+    action_tx.send(Action::SelectOpcode(0));
 
     loop {
       if let Some(e) = tui.next().await {
@@ -118,6 +122,16 @@ impl App {
               self.emulator.emulate_cycle();
               action_tx.send(Action::Redraw(self.emulator.screen()));
               action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter() - 512));
+              
+              if let Some(last_tick) = self.last_timer_tick {
+                if Instant::now().duration_since(last_tick).as_millis() > 16_667 {
+                  self.last_timer_tick = Some(Instant::now());
+                  self.emulator.update_delay_timer();
+                  if self.emulator.update_sound_timer() {
+                    // BEEP!!!
+                  }
+                }
+              }
             }
           },
           Action::Quit => self.should_quit = true,
@@ -144,8 +158,8 @@ impl App {
               }
             })?;
           },
-          Action::StartEmulation => { self.running = true },
-          Action::StopEmulation => { self.running = false },
+          Action::StartEmulation => { self.running = true; self.last_timer_tick = Some(Instant::now()) },
+          Action::StopEmulation => { self.running = false; self.last_timer_tick = None },
           _ => {},
         }
         for component in self.components.iter_mut() {
