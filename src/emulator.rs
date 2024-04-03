@@ -128,6 +128,8 @@ impl Chip8Emu {
                     let shift = cx % 8;
                     let initial_screen_state = self.gfx[screen_byte_index as usize];
                     self.gfx[screen_byte_index as usize] ^= row_data >> shift;
+                    self.gfx[screen_byte_index as usize + 1] ^= row_data << (8 - shift);
+                    
 
                     if (initial_screen_state << shift) & row_data != 0 {
                         self.registers[0xF] = 0x01;
