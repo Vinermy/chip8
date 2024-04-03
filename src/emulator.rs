@@ -144,10 +144,14 @@ impl Chip8Emu {
 
                 for row in 0..n as u16 {
                     let row_data: u8 = self.memory[(self.index_register + row) as usize];
-                    let screen_byte_index = cy * 8 + cx.div(8);
+                    let screen_byte_index = cy * 8 + cx.div(8) + (row * 8) as u8;
                     let shift = cx % 8;
                     let initial_screen_state = self.gfx[screen_byte_index as usize];
                     self.gfx[screen_byte_index as usize] ^= row_data >> shift;
+                    log::log!(Level::Info, "Drawn at {}: {:8b} -> {:8b}",
+                        screen_byte_index,
+                        initial_screen_state,
+                        self.gfx[screen_byte_index as usize]);
 
                     if (shift != 0) & (cx < 56) {
                         self.gfx[screen_byte_index as usize + 1] ^= row_data << (8 - shift);
@@ -177,8 +181,8 @@ impl Chip8Emu {
 
             _ => { return Err(EmulationErr::UnknownOpcode(self.opcode)) }
         }
-        log::log!(Level::Info, "Executed opcode: 0x{:X}, registers: {:?}", self.opcode, self
-            .registers);
+        log::log!(Level::Info, "Executed opcode: 0x{:X}, registers: {:?}, index register: {}", 
+            self.opcode, self.registers, self.index_register);
         // Update timers
 
         Ok(())
