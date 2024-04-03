@@ -69,7 +69,7 @@ impl App {
       component.init(tui.size()?)?;
     }
 
-    self.emulator.load_rom_from_file("./examples/IBM Logo.ch8").expect("Can read file");
+    self.emulator.load_rom_from_file("./examples/test_opcode.ch8").expect("Can read file");
     action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
 
     loop {
