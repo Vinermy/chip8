@@ -119,13 +119,13 @@ impl Chip8Emu {
             },
 
             // 0x6XNN - Set register VX to NN
-            0x6000..=0x6EFF => {
+            0x6000..=0x6FFF => {
                 self.registers[x] = nn;
                 log::log!(Level::Info, "Set register V{:X} to {}", x, nn);
             },
 
             // 0x7XNN - Add NN to register VX
-            0x7000..=0x7EFF => {
+            0x7000..=0x7FFF => {
                 self.registers[x] = self.registers[x].wrapping_add(nn);
                 log::log!(Level::Info, "Added {} to register V{:X}", nn, x);
             }
