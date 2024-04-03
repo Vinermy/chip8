@@ -44,7 +44,7 @@ impl App {
       mode,
       last_tick_key_events: Vec::new(),
       emulator: Chip8Emu::new(),
-      running: true,
+      running: false,
     })
   }
 
