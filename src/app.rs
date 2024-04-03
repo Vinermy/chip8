@@ -12,6 +12,7 @@ use crate::{
   mode::Mode,
   tui,
 };
+use crate::components::opcodes_list::OpcodesList;
 use crate::components::status::StatusBar;
 use crate::emulator::Chip8Emu;
 
@@ -33,11 +34,12 @@ impl App {
     let config = Config::new()?;
     let screen = Screen::new();
     let status = StatusBar::new();
+    let opcode_list = OpcodesList::new();
     let mode = Mode::Home;
     Ok(Self {
       tick_rate,
       frame_rate,
-      components: vec![Box::new(screen), Box::new(status)],
+      components: vec![Box::new(screen), Box::new(status), Box::new(opcode_list)],
       should_quit: false,
       should_suspend: false,
       config,
@@ -68,6 +70,7 @@ impl App {
     }
 
     self.emulator.load_rom_from_file("./examples/IBM Logo.ch8").expect("Can read file");
+    action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
     
     loop {
       if let Some(e) = tui.next().await {

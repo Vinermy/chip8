@@ -21,4 +21,6 @@ pub enum Action {
   StartEmulation,
   StopEmulation,
   UpdateOpcode(u16),
+  LoadOpcodesList(Vec<u16>),
+  SelectOpcode(u16),
 }
