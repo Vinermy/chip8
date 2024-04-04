@@ -13,6 +13,7 @@ use crate::{
   mode::Mode,
   tui,
 };
+use crate::components::file_selector::FileSelector;
 use crate::components::opcodes_list::OpcodesList;
 use crate::components::status::StatusBar;
 use crate::emulator::Chip8Emu;
@@ -37,11 +38,12 @@ impl App {
     let screen = Screen::new();
     let status = StatusBar::new();
     let opcode_list = OpcodesList::new();
+    let file_selector = FileSelector::new();
     let mode = Mode::Home;
     Ok(Self {
       tick_rate,
       frame_rate,
-      components: vec![Box::new(screen), Box::new(status), Box::new(opcode_list)],
+      components: vec![Box::new(screen), Box::new(status), Box::new(opcode_list), Box::new(file_selector)],
       should_quit: false,
       should_suspend: false,
       config,
@@ -72,9 +74,9 @@ impl App {
       component.init(tui.size()?)?;
     }
 
-    self.emulator.load_rom_from_file("./examples/test_opcode.ch8").expect("Can read file");
-    action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
-    action_tx.send(Action::SelectOpcode(0));
+    // self.emulator.load_rom_from_file("./examples/test_opcode.ch8").expect("Can read file");
+    // action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
+    // action_tx.send(Action::SelectOpcode(0));
 
     loop {
       if let Some(e) = tui.next().await {
@@ -120,12 +122,13 @@ impl App {
             if self.running {
               action_tx.send(Action::UpdateOpcode(self.emulator.get_opcode()));
               self.emulator.emulate_cycle();
-              action_tx.send(Action::Redraw(self.emulator.screen()));
-              action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter() - 512));
+              action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter()));
               
               if let Some(last_tick) = self.last_timer_tick {
                 if Instant::now().duration_since(last_tick).as_millis() > 16_667 {
                   self.last_timer_tick = Some(Instant::now());
+                  
+                  action_tx.send(Action::Redraw(self.emulator.screen()));
                   self.emulator.update_delay_timer();
                   if self.emulator.update_sound_timer() {
                     // BEEP!!!

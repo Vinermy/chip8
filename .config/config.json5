@@ -4,6 +4,12 @@
       "<Ctrl-c>": "Quit", // Yet another way to quit
       "<Ctrl-r>": "StartEmulation",
       "<Ctrl-h>": "StopEmulation",
+      "<Ctrl-o>": "FocusFileSelector"
+    },
+    "SelectingFile": {
+      "<Up>": "MoveFileSelectorUp",
+      "<Down>": "MoveFileSelectorDown",
+      "<Enter>": "SelectFile"
     },
   }
 }

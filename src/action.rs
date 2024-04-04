@@ -23,4 +23,8 @@ pub enum Action {
   UpdateOpcode(u16),
   LoadOpcodesList(Vec<u16>),
   SelectOpcode(u16),
+  FocusFileSelector,
+  MoveFileSelectorUp,
+  MoveFileSelectorDown,
+  SelectFile,
 }
