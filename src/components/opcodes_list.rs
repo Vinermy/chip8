@@ -5,6 +5,7 @@ use crate::action::Action;
 use crate::components::Component;
 use crate::tui::Frame;
 
+#[derive(Default)]
 pub struct  OpcodesList {
     state: ListState,
     opcodes: Vec<u16>,
@@ -12,13 +13,7 @@ pub struct  OpcodesList {
 }
 
 impl OpcodesList {
-    pub fn new() -> Self {
-        Self {
-            state: ListState::default(),
-            opcodes: Vec::new(),
-            current_opcode: 0,
-        }
-    }
+    pub fn new() -> Self { Self::default() }
 }
 
 impl Component for OpcodesList {

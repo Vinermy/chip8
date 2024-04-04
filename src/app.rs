@@ -123,15 +123,19 @@ impl App {
           Action::Tick => {
             self.last_tick_key_events.drain(..);
             if self.running {
-              action_tx.send(Action::UpdateOpcode(self.emulator.get_opcode()));
-              self.emulator.emulate_cycle();
-              action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter()));
+              action_tx.send(Action::UpdateOpcode(self.emulator.get_opcode())).expect("Can send an action");
+              if let Err(emu_err) = self.emulator.emulate_cycle() {
+                action_tx.send(Action::Error(emu_err.into())).expect("Can send an action");
+              }
+              action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter() - 512))
+                  .expect("Can send an action");
               
               if let Some(last_tick) = self.last_timer_tick {
                 if Instant::now().duration_since(last_tick).as_millis() > 16 {
                   self.last_timer_tick = Some(Instant::now());
                   
-                  action_tx.send(Action::Redraw(self.emulator.screen()));
+                  action_tx.send(Action::Redraw(self.emulator.screen()))
+                      .expect("Can send an action");
                   self.emulator.update_delay_timer();
                   if self.emulator.update_sound_timer() {
                     // BEEP!!!

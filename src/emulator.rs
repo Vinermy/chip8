@@ -11,9 +11,31 @@ use itertools::traits::HomogeneousTuple;
 pub enum EmulationErr {
     UnknownOpcode(u16),
     StackOverflow,
-    InvalidRegister,
+    InvalidValueInRegister(u8, u8),
     FileError(String),
     NoSubroutineToExit,
+}
+
+impl Into<String> for EmulationErr {
+    fn into(self) -> String {
+        match self {
+            EmulationErr::UnknownOpcode(opcode) => {
+                format!("Unknown/unimplemented opcode encountered: 0x{:0>4X}", opcode)
+            }
+            EmulationErr::StackOverflow => {
+                "Stack overflow".to_string()
+            }
+            EmulationErr::InvalidValueInRegister(register, value) => {
+                format!("Register V{:X} contains invalid value 0x{:0>4X}", register, value)
+            }
+            EmulationErr::FileError(filename) => {
+                format!("Can't read file {}", filename)
+            }
+            EmulationErr::NoSubroutineToExit => {
+                "No subroutine to exit".to_string()
+            }
+        }
+    }
 }
 
 
@@ -81,6 +103,20 @@ impl Chip8Emu {
     pub fn new() -> Self { Self::default() }
     pub fn screen(&self) -> Vec<u8> { self.gfx.clone() }
     
+    fn reset(&mut self) {
+        self.opcode = 0x0000;
+        self.memory = vec![0x00; 4096];
+        self.registers = vec![0x00; 16];
+        self.index_register = 0x0000;
+        self.program_counter = 0x0200;
+        self.gfx = vec![0x00; 8 * 32];
+        self.delay_timer = 0x00;
+        self.sound_timer = 0x00;
+        self.stack = vec![0x0000; 16];
+        self.stack_pointer = 0x0000;
+        self.keys = vec![false; 16];
+    }
+    
     pub fn get_opcode(&self) -> u16 { self.opcode }
     pub fn get_program_counter(&self) -> u16 { self.program_counter }
 
@@ -101,6 +137,7 @@ impl Chip8Emu {
 
         match file_contents {
             Ok(mut bytes) => {
+                self.reset();
                 let length = bytes.len();
                 self.memory = Vec::new();
                 self.memory.append(&mut vec![0x00; 80]);
@@ -427,7 +464,8 @@ impl Chip8Emu {
                     0xD => { 0x0091 },
                     0xE => { 0x0096 },
                     0xF => { 0x009B },
-                    _ => { return Err(EmulationErr::InvalidRegister) }
+                    _ => { return Err(EmulationErr::InvalidValueInRegister(x as u8, self
+                        .registers[x])) }
                 }
             },
 
