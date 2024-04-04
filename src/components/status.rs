@@ -29,7 +29,10 @@ impl Component for StatusBar {
             ]
         ).split(area);
 
-        let status = Paragraph::new(format!("Current opcode: 0x{:X}", self.opcode))
+        let status = Paragraph::new(format!(
+            "Press <Ctrl-O> to focus file selector, <Enter> to load selected script, <Ctrl-R> to run loaded script, <Ctrl-H> to pause running script | Current opcode: 0x{:X}",
+            self.opcode)
+        )
             .block(Block::default().borders(Borders::ALL));
         
         f.render_widget(status, chunks_v[1]);

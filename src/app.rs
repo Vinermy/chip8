@@ -5,6 +5,7 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use tracing_subscriber::fmt::format;
 
 use crate::{
   action::Action,
@@ -30,6 +31,8 @@ pub struct App {
   pub emulator: Chip8Emu,
   pub running: bool,
   last_timer_tick: Option<Instant>,
+  emu_ready: bool,
+  script_filename: String,
 }
 
 impl App {
@@ -52,6 +55,8 @@ impl App {
       emulator: Chip8Emu::new(),
       running: false,
       last_timer_tick: None,
+      emu_ready: false,
+      script_filename: "".to_string(),
     })
   }
 
@@ -74,9 +79,7 @@ impl App {
       component.init(tui.size()?)?;
     }
 
-    // self.emulator.load_rom_from_file("./examples/test_opcode.ch8").expect("Can read file");
-    // action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
-    // action_tx.send(Action::SelectOpcode(0));
+    
 
     loop {
       if let Some(e) = tui.next().await {
@@ -125,7 +128,7 @@ impl App {
               action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter()));
               
               if let Some(last_tick) = self.last_timer_tick {
-                if Instant::now().duration_since(last_tick).as_millis() > 16_667 {
+                if Instant::now().duration_since(last_tick).as_millis() > 16 {
                   self.last_timer_tick = Some(Instant::now());
                   
                   action_tx.send(Action::Redraw(self.emulator.screen()));
@@ -163,6 +166,16 @@ impl App {
           },
           Action::StartEmulation => { self.running = true; self.last_timer_tick = Some(Instant::now()) },
           Action::StopEmulation => { self.running = false; self.last_timer_tick = None },
+          Action::FocusFileSelector => { self.mode = Mode::SelectingFile },
+          Action::LoadFile(ref filename) => {
+            self.mode = Mode::Home;
+            self.emu_ready = true;
+            self.script_filename = filename.clone();
+
+            self.emulator.load_rom_from_file(format!("./scripts/{}", self.script_filename).as_str()).expect("Can read file");
+            action_tx.send(Action::LoadOpcodesList(self.emulator.get_opcodes()));
+            action_tx.send(Action::SelectOpcode(0));
+          }
           _ => {},
         }
         for component in self.components.iter_mut() {

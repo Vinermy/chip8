@@ -9,7 +9,7 @@
     "SelectingFile": {
       "<Up>": "MoveFileSelectorUp",
       "<Down>": "MoveFileSelectorDown",
-      "<Enter>": "SelectFile"
+      "<Enter>": "SelectFile",
     },
   }
 }

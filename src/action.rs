@@ -27,4 +27,5 @@ pub enum Action {
   MoveFileSelectorUp,
   MoveFileSelectorDown,
   SelectFile,
+  LoadFile(String),
 }

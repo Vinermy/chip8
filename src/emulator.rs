@@ -12,7 +12,7 @@ pub enum EmulationErr {
     UnknownOpcode(u16),
     StackOverflow,
     InvalidRegister,
-    FileError,
+    FileError(String),
     NoSubroutineToExit,
 }
 
@@ -112,7 +112,7 @@ impl Chip8Emu {
                 Ok(())
             }
             Err(_) => {
-                Err(EmulationErr::FileError)
+                Err(EmulationErr::FileError(file_path.to_string()))
             }
         }
 
@@ -259,8 +259,9 @@ impl Chip8Emu {
                     // shifted out bit
                     6 => {
                         self.registers[x] = self.registers[y];
-                        self.registers[0xF] = self.registers[x] % 2;
+                        let shifted_out = self.registers[x] % 2;
                         self.registers[x] >>= 1;
+                        self.registers[15] = shifted_out;
                     },
 
                     // VX is set to the result of VY - VX
@@ -275,8 +276,9 @@ impl Chip8Emu {
                     // shifted out bit
                     0xE => {
                         self.registers[x] = self.registers[y];
-                        self.registers[0xF] = (self.registers[x] >= 128) as u8;
+                        let shifted_out = (self.registers[x] >= 128) as u8;
                         self.registers[x] <<= 1;
+                        self.registers[15] = shifted_out;
                     },
 
                     _ => {
