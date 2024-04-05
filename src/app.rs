@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::path::Components;
 use std::time::Instant;
 use color_eyre::eyre::Result;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -18,6 +19,35 @@ use crate::components::file_selector::FileSelector;
 use crate::components::opcodes_list::OpcodesList;
 use crate::components::status::StatusBar;
 use crate::emulator::Chip8Emu;
+
+const KEYBOARD: [KeyCode; 16] = [
+  KeyCode::Char('1'), KeyCode::Char('2'), KeyCode::Char('3'), KeyCode::Char('4'),
+  KeyCode::Char('q'), KeyCode::Char('w'), KeyCode::Char('e'), KeyCode::Char('r'),
+  KeyCode::Char('a'), KeyCode::Char('s'), KeyCode::Char('d'), KeyCode::Char('f'),
+  KeyCode::Char('z'), KeyCode::Char('x'), KeyCode::Char('c'), KeyCode::Char('v'),
+];
+
+fn get_key_from_char(c: &char) -> u8 {
+  match c {
+    '1' => 1,
+    '2' => 2,
+    '3' => 3,
+    '4' => 12,
+    'q' => 4,
+    'w' => 5,
+    'e' => 6,
+    'r' => 13,
+    'a' => 7,
+    's' => 8,
+    'd' => 9,
+    'f' => 14,
+    'z' => 10,
+    'x' => 0,
+    'c' => 11,
+    'v' => 15,
+    _ => u8::MAX,
+  }
+}
 
 pub struct App {
   pub config: Config,
@@ -79,7 +109,7 @@ impl App {
       component.init(tui.size()?)?;
     }
 
-    
+
 
     loop {
       if let Some(e) = tui.next().await {
@@ -89,6 +119,24 @@ impl App {
           tui::Event::Render => action_tx.send(Action::Render)?,
           tui::Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
           tui::Event::Key(key) => {
+            if let KeyCode::Char(keycode) = key.code {
+              if KEYBOARD.contains(&key.code) {
+                match key.kind {
+                  KeyEventKind::Press => {
+                    let _ = self.emulator.press(
+                      &get_key_from_char(&keycode)
+                    );
+                  }
+                  KeyEventKind::Repeat => {}
+                  KeyEventKind::Release => {
+                    let _ = self.emulator.release(
+                      &get_key_from_char(&keycode)
+                    );
+                  }
+                }
+              }
+            }
+
             if let Some(keymap) = self.config.keybindings.get(&self.mode) {
               if let Some(action) = keymap.get(&vec![key]) {
                 log::info!("Got action: {action:?}");

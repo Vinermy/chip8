@@ -2,6 +2,7 @@ use std::{fs, io};
 use std::io::Error;
 use std::ops::{Deref, Div};
 use std::path::Path;
+use clap::builder::Str;
 use log::Level;
 use rand::Rng;
 use itertools::{Itertools, Tuples};
@@ -14,11 +15,14 @@ pub enum EmulationErr {
     InvalidValueInRegister(u8, u8),
     FileError(String),
     NoSubroutineToExit,
+    InvalidKeycode,
+    ProgramExited,
+    InvalidRegisterReference,
 }
 
-impl Into<String> for EmulationErr {
-    fn into(self) -> String {
-        match self {
+impl From<EmulationErr> for String {
+    fn from(err: EmulationErr) -> String {
+        match err {
             EmulationErr::UnknownOpcode(opcode) => {
                 format!("Unknown/unimplemented opcode encountered: 0x{:0>4X}", opcode)
             }
@@ -33,6 +37,15 @@ impl Into<String> for EmulationErr {
             }
             EmulationErr::NoSubroutineToExit => {
                 "No subroutine to exit".to_string()
+            }
+            EmulationErr::InvalidKeycode => {
+                "Invalid keycode supplied".to_string()
+            }
+            EmulationErr::ProgramExited => {
+                "Program exited".to_string()
+            }
+            EmulationErr::InvalidRegisterReference => {
+                "Invalid register reference supplied".to_string()
             }
         }
     }
@@ -60,6 +73,14 @@ fn font() -> Vec<u8> {
     ]
 }
 
+#[derive(Default)]
+struct Quirks {
+    superchip_opcodes: bool, // Enables opcodes that were *added* in Superchip
+    superchip_shift: bool, // Enables the new behaviour of 0x8XY6 and 0x8XYE from Superchip
+    superchip_offset_jump: bool, // Enables the 0xBNNN behaviour from Superchip
+    superchip_memory: bool, // Enables the 0xFX55 and 0xFX65 behaviour from Superchip
+}
+
 
 /// Emulator of Chip-8
 pub struct Chip8Emu {
@@ -78,7 +99,12 @@ pub struct Chip8Emu {
     stack: Vec<u16>,
     stack_pointer: u16,
 
-    keys: Vec<bool>
+    keys: Vec<bool>,
+    quirks: Quirks,
+
+    // SUPERCHIP related features
+    rpl: Vec<u8>,
+    is_hi_res_mode: bool
 }
 
 impl Default for Chip8Emu {
@@ -95,6 +121,9 @@ impl Default for Chip8Emu {
             stack: vec![0x0000; 16],
             stack_pointer: 0x0000,
             keys: vec![false; 16],
+            quirks: Quirks::default(),
+            rpl: vec![0x00; 8],
+            is_hi_res_mode: false,
         }
     }
 }
@@ -115,6 +144,7 @@ impl Chip8Emu {
         self.stack = vec![0x0000; 16];
         self.stack_pointer = 0x0000;
         self.keys = vec![false; 16];
+        self.is_hi_res_mode = false;
     }
     
     pub fn get_opcode(&self) -> u16 { self.opcode }
@@ -168,6 +198,26 @@ impl Chip8Emu {
         }
         false
     }
+
+    pub fn press(&mut self, key: &u8) -> Result<(), EmulationErr> {
+        if (0..=15).contains(key) {
+            self.keys[*key as usize] = true;
+        } else {
+            return Err(EmulationErr::InvalidKeycode)
+        }
+        Ok(())
+    }
+
+    pub fn release(&mut self, key: &u8) -> Result<(), EmulationErr> {
+        if (0..=15).contains(key) {
+            self.keys[*key as usize] = false;
+        } else {
+            return Err(EmulationErr::InvalidKeycode)
+        }
+        Ok(())
+    }
+
+
 
     pub fn emulate_cycle(&mut self) -> Result<(), EmulationErr> {
         // Fetch opcode
@@ -494,11 +544,86 @@ impl Chip8Emu {
                 }
             },
             
-            _ => { return Err(EmulationErr::UnknownOpcode(self.opcode)) }
+            opcode => {
+                if self.quirks.superchip_opcodes {
+                    return self.handle_superchip_opcode(opcode, x, y, n, nn, nnn)
+                } else {
+                    return Err(EmulationErr::UnknownOpcode(self.opcode))
+                }
+            }
         }
         log::log!(Level::Info, "Executed opcode: 0x{:0>4X}, registers: {:?}, index register: {}",
             self.opcode, self.registers, self.index_register);
         // Update timers
+
+        Ok(())
+
+    }
+    fn handle_superchip_opcode(
+        &mut self, opcode: u16, x: usize, y: usize, n: u8, nn: u8, nnn: u16
+    ) -> Result<(), EmulationErr> {
+
+        match opcode {
+            // 0x00CN - Scroll display N lines down
+            0x00C0..=0x00CF => {
+                self.gfx = [
+                    vec![0x00; (8 * n) as usize],
+                    self.gfx.clone(),
+                ].concat();
+            }
+            
+            // 0x00FB - Scroll display 4 pixels right
+            0x00FB => {
+                let mut rem: Option<u8>;
+                for row in 0..32 {
+                    rem = None;
+                    for col in 0..8 {
+                        let chunk = self.gfx[row * 8 + col];
+                        let new_rem = chunk & 0x0F;
+                        if rem.is_some() {
+                            self.gfx[row * 8 + col] = (chunk >> 4) | (rem.unwrap() << 4);
+                        } else {
+                            self.gfx[row * 8 + col] = chunk >> 4;
+                        }
+                        rem = Some(new_rem);
+                    }
+                }
+            }
+            
+            0x00FD => {
+                return Err(EmulationErr::ProgramExited)
+            }
+
+            0x00FE => {
+                // Disable high-resolution mode
+            }
+
+            0x00FF => {
+                // Enable high-resolution mode
+            }
+
+            // 0xFX75 - Store V0..VX in RPL user flags (X <= 7)
+            _ if opcode & 0xF0FF == 0xF075 => {
+                if x > 7 {
+                    return Err(EmulationErr::InvalidRegisterReference)
+                }
+                let portion = &self.registers[0..=x];
+                self.rpl[0..][..=x].copy_from_slice(portion);
+            }
+            
+            // 0xFX85 - Read V0..VX from RPL user flags (X <= 7)
+            _ if opcode & 0xF0FF == 0xF075 => {
+                if x > 7 {
+                    return Err(EmulationErr::InvalidRegisterReference)
+                }
+                let portion = &self.rpl[0..=x];
+                self.registers[0..][..=x].copy_from_slice(portion);
+            }
+
+            _ => {
+                return Err(EmulationErr::UnknownOpcode(opcode))
+            }
+        }
 
         Ok(())
     }
