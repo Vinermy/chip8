@@ -6,7 +6,7 @@ use clap::Parser;
 #[command(author, about)]
 pub struct Cli {
   #[arg(short, long, value_name = "FLOAT", help = "Tick rate, i.e. number of ticks per second",
-  default_value_t = 10.0)]
+  default_value_t = 1000.0)]
   pub tick_rate: f64,
 
   #[arg(

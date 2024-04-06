@@ -121,18 +121,12 @@ impl App {
           tui::Event::Key(key) => {
             if let KeyCode::Char(keycode) = key.code {
               if KEYBOARD.contains(&key.code) {
-                match key.kind {
-                  KeyEventKind::Press => {
-                    let _ = self.emulator.press(
-                      &get_key_from_char(&keycode)
-                    );
-                  }
-                  KeyEventKind::Repeat => {}
-                  KeyEventKind::Release => {
-                    let _ = self.emulator.release(
-                      &get_key_from_char(&keycode)
-                    );
-                  }
+                log::info!("CAPTURED KEY PRESS");
+                let r = self.emulator.press(
+                  &get_key_from_char(&keycode)
+                );
+                if let Err(err) = r {
+                  log::error!("Error while capturing key press: {}", String::from(err))
                 }
               }
             }
@@ -173,7 +167,8 @@ impl App {
             if self.running {
               action_tx.send(Action::UpdateOpcode(self.emulator.get_opcode())).expect("Can send an action");
               if let Err(emu_err) = self.emulator.emulate_cycle() {
-                action_tx.send(Action::Error(emu_err.into())).expect("Can send an action");
+                action_tx.send(Action::Error(emu_err.clone().into())).expect("Can send an action");
+                log::error!("{}", String::from(emu_err));
               }
               action_tx.send(Action::SelectOpcode(self.emulator.get_program_counter() - 512))
                   .expect("Can send an action");

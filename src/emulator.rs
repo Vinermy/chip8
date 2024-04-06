@@ -8,7 +8,7 @@ use rand::Rng;
 use itertools::{Itertools, Tuples};
 use itertools::traits::HomogeneousTuple;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EmulationErr {
     UnknownOpcode(u16),
     StackOverflow,
@@ -205,6 +205,7 @@ impl Chip8Emu {
         } else {
             return Err(EmulationErr::InvalidKeycode)
         }
+        log::info!("Key press registered: {key}");
         Ok(())
     }
 
@@ -214,6 +215,7 @@ impl Chip8Emu {
         } else {
             return Err(EmulationErr::InvalidKeycode)
         }
+        log::info!("Key release registered: {key}");
         Ok(())
     }
 
@@ -248,6 +250,7 @@ impl Chip8Emu {
             // 0x00EE - Exit from subroutine
             0x00EE => {
                 self.program_counter = self.stack[self.stack_pointer as usize];
+                log::info!("Exiting from subroutine to 0x{:0>3X}", self.program_counter);
 
                 if self.stack_pointer == 0 {
                     return Err(EmulationErr::NoSubroutineToExit);
@@ -267,11 +270,13 @@ impl Chip8Emu {
                 self.stack_pointer += 1;
                 self.stack[self.stack_pointer as usize] = self.program_counter;
                 self.program_counter = nnn;
+                log::info!("Entered subroutine at 0x{:0>3X}", nnn)
             },
 
             // 0x3XNN - Skip one instruction if the value in VX is equal to NN
             0x3000..=0x3FFF => {
                 if self.registers[x] == nn {
+                    log::info!("Skipped instruction at 0x{:0>3X}", self.program_counter);
                     self.program_counter += 2;
                 }
             },
@@ -279,6 +284,7 @@ impl Chip8Emu {
             // 0x4XNN - Skip one instruction if the value in VX is not equal to NN
             0x4000..=0x4FFF => {
                 if self.registers[x] != nn {
+                    log::info!("Skipped instruction at 0x{:0>3X}", self.program_counter);
                     self.program_counter += 2;
                 }
             },
@@ -286,6 +292,7 @@ impl Chip8Emu {
             // 0x5XY0 - Skip one instruction if the value in VX is equal to value in VY
             0x5000..=0x5FF0 => {
                 if self.registers[x] == self.registers[y] {
+                    log::info!("Skipped instruction at 0x{:0>3X}", self.program_counter);
                     self.program_counter += 2;
                 }
             },
@@ -308,22 +315,26 @@ impl Chip8Emu {
 
                     // VX is set to the value of VY
                     0 => {
-                        self.registers[x] = self.registers[y]
+                        self.registers[x] = self.registers[y];
+                        log::info!("Set the value of register {x} to the value of the register {y}")
                     },
 
                     // VX is set to the bitwise (OR) of VX and VY. VY is not affected.
                     1 => {
-                        self.registers[x] |= self.registers[y]
+                        self.registers[x] |= self.registers[y];
+                        log::info!("Set the register {x} to the bitwise OR of register {x} and register {y}")
                     },
 
                     // VX is set to the bitwise (AND) of VX and VY. VY is not affected.
                     2 => {
-                        self.registers[x] &= self.registers[y]
+                        self.registers[x] &= self.registers[y];
+                        log::info!("Set the register {x} to the bitwise AND of register {x} and register {y}")
                     },
 
                     // VX is set to the bitwise (XOR) of VX and VY. VY is not affected.
                     3 => {
-                        self.registers[x] ^= self.registers[y]
+                        self.registers[x] ^= self.registers[y];
+                        log::info!("Set the register {x} to the bitwise XOR or register {x} and register {y}")
                     },
 
                     // VX is set to the value of VX plus the value of VY. VY is not affected.
@@ -332,6 +343,7 @@ impl Chip8Emu {
                             .overflowing_add(self.registers[y]);
                         self.registers[x] = result;
                         self.registers[15] = is_overflow as u8;
+                        log::info!("Set the register {x} to the sum of register {x} and register {y}")
                     },
 
                     // VX is set to the result of VX - VY
@@ -340,6 +352,7 @@ impl Chip8Emu {
                             .overflowing_sub(self.registers[y]);
                         self.registers[x] = result;
                         self.registers[15] = 1 - (is_overflow as u8);
+                        log::info!("Set the register {x} to the result of subtracting register {y} from register {x}")
                     }
 
                     // Sets VX equal to VY and shifts it one bit to the right. VF is set to the
@@ -349,6 +362,7 @@ impl Chip8Emu {
                         let shifted_out = self.registers[x] % 2;
                         self.registers[x] >>= 1;
                         self.registers[15] = shifted_out;
+                        log::info!("Set the register {x} to the register {y} shifted one bit to the right")
                     },
 
                     // VX is set to the result of VY - VX
@@ -357,6 +371,7 @@ impl Chip8Emu {
                             .overflowing_sub(self.registers[x]);
                         self.registers[x] = result;
                         self.registers[15] = 1 - (is_overflow as u8);
+                        log::info!("Set the register {x} to the result of subtracting register {x} from register {y}")
                     },
 
                     // Sets VX equal to VY and shifts it one bit to the left. VF is set to the
@@ -366,6 +381,7 @@ impl Chip8Emu {
                         let shifted_out = (self.registers[x] >= 128) as u8;
                         self.registers[x] <<= 1;
                         self.registers[15] = shifted_out;
+                        log::info!("Set the register {x} to the register {y} shifted one bit to the left")
                     },
 
                     _ => {
@@ -378,6 +394,7 @@ impl Chip8Emu {
             0x9000..=0x9FF0 => {
                 if self.registers[x] != self.registers[y] {
                     self.program_counter += 2;
+                    log::info!("Skipped instruction at 0x{:0>3X}", self.program_counter);
                 }
             },
 
@@ -390,12 +407,14 @@ impl Chip8Emu {
             // 0xBNNN - Jump with offset of NNN
             0xB000..=0xBFFF => {
                 self.program_counter = nnn + self.registers[0] as u16;
+                log::info!("Jumped to the 0x{:0>3X}", self.program_counter)
             },
 
             // 0xCXNN - Put random value with mask NN into VX
             0xC000..=0xCFFF => {
                 let mut rng = rand::thread_rng();
                 self.registers[x] = rng.gen_range(0..=255) & nn;
+                log::info!("Set the register {x} to the random value of {}", self.registers[x])
             }
 
             // 0xDXYN - Draw N bytes starting at memory address in index register at (VX, VY)
@@ -446,34 +465,39 @@ impl Chip8Emu {
 
             // 0xEX9E - Skip if key VX is pressed
             opcode if opcode & 0xF0FF == 0xE09E => {
-                if self.keys[self.registers[x] as usize] {
+                if self.keys[(self.registers[x] & 0x0F) as usize] {
                     self.program_counter += 2;
+                    log::info!("Skipped to 0x{:0>3X} as the key {x} was pressed", self.program_counter)
                 }
             },
 
             // 0xEXA1 - Skip if key VX is not pressed
             opcode if opcode & 0xF0FF == 0xE0A1 => {
-                if !self.keys[self.registers[x] as usize] {
+                if !self.keys[(self.registers[x] & 0x0F) as usize] {
                     self.program_counter += 2;
+                    log::info!("Skipped to 0x{:0>3X} as the key {x} was not pressed", self.program_counter)
                 }
             },
 
             // 0xFX07 - Set VX to the current value of the delay timer
             opcode if opcode & 0xF0FF == 0xF007 => {
                 self.registers[x] = self.delay_timer;
+                log::info!("Set register {x} to the value of delay timer {}", self.delay_timer)
             },
 
             // 0xFX15 - Set the delay timer to VX
             opcode if opcode & 0xF0FF == 0xF015 => {
                 self.delay_timer = self.registers[x];
+                log::info!("Set the delay timer to the value of register {x} - {}", self.delay_timer)
             },
 
             // 0xFX18 - Set the sound timer to VX
             opcode if opcode & 0xF0FF == 0xF018 => {
                 self.sound_timer = self.registers[x];
+                log::info!("Set the sound timer to the value of register {x} - {}", self.delay_timer)
             },
 
-            // 0xFX1E - Set the value in VX to the index register
+            // 0xFX1E - Add the value in VX to the index register
             opcode if opcode & 0xF0FF == 0xF01E => {
                 self.index_register += self.registers[x] as u16;
                 if self.index_register > 4095 {
@@ -482,17 +506,21 @@ impl Chip8Emu {
                 } else {
                     self.registers[15] = 0x00;
                 }
+                log::info!("Added the value from register {x} to the index register")
             },
 
             // 0xFX0A - Wait for a key press and store it in VX
             opcode if opcode & 0xF0FF == 0xF00A => {
+                log::info!("Waiting for a key press at 0x{:0>3X}", self.program_counter);
                 if self.keys.iter().any(|x| { *x }) {
                     let (index, value) = self.keys.iter()
                         .find_position(|x| { **x }).unwrap();
                     self.registers[x] = index as u8;
+                    log::info!("Captured keypress: {index}")
                 } else {
                     self.program_counter -= 2;
                 }
+                
             },
 
             // 0xFX29 - Set the index register to the position of the hexadecimal character in VX
@@ -516,7 +544,8 @@ impl Chip8Emu {
                     0xF => { 0x009B },
                     _ => { return Err(EmulationErr::InvalidValueInRegister(x as u8, self
                         .registers[x])) }
-                }
+                };
+                log::info!("Set the index register to the position of the character {:X}", self.registers[x])
             },
 
             // 0xFX33 - Store the Binary-coded decimal value of VX starting at index register
@@ -524,6 +553,8 @@ impl Chip8Emu {
                 self.memory[self.index_register as usize] = self.registers[x].div(100);
                 self.memory[self.index_register as usize + 1] = (self.registers[x] % 100).div(10);
                 self.memory[self.index_register as usize + 2] = self.registers[x] % 10;
+                log::info!("Stored the BCD value {} starting at position 0x{:0>3X}",
+                    self.registers[x], self.index_register)
             },
             
             // 0xFX55 - Store V0 - VX into memory
@@ -533,6 +564,8 @@ impl Chip8Emu {
                         (self.index_register + offset as u16) as usize
                         ] = self.registers[offset]
                 }
+                log::info!("Saved values {:?} into memory starting at 0x{:0>3X}",
+                    &self.registers[0..=x], self.index_register)
             },
             
             // 0xFX65 - Load into V0 - VX from memory
@@ -542,6 +575,9 @@ impl Chip8Emu {
                         (self.index_register + offset as u16) as usize
                         ];
                 }
+
+                log::info!("Loaded values {:?} from memory starting at 0x{:0>3X}",
+                    &self.registers[0..=x], self.index_register)
             },
             
             opcode => {
